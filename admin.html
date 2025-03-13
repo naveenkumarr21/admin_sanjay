@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Booking Management</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 2.5rem;
+            font-weight: 600;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th,
+        td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        th {
+            background-color: #007bff;
+            color: white;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        tr:hover {
+            background-color: #f9f9f9;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-right: 5px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .btn-accept {
+            background-color: #28a745;
+            color: white;
+        }
+
+        .btn-accept:hover {
+            background-color: #218838;
+        }
+
+        .btn-reject {
+            background-color: #dc3545;
+            color: white;
+        }
+
+        .btn-reject:hover {
+            background-color: #c82333;
+        }
+
+        .btn:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        .status {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            text-align: center;
+        }
+
+        .status-pending {
+            background-color: #ffc107;
+            color: #333;
+        }
+
+        .status-accepted {
+            background-color: #28a745;
+            color: white;
+        }
+
+        .status-rejected {
+            background-color: #dc3545;
+            color: white;
+        }
+
+        .message {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 1rem;
+            color: #333;
+        }
+
+        .loading {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 1.2rem;
+            color: #007bff;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+            }
+
+            table {
+                display: block;
+                overflow-x: auto;
+            }
+
+            th,
+            td {
+                padding: 10px;
+            }
+
+            .btn {
+                padding: 6px 12px;
+                font-size: 0.8rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Admin - Booking Management</h1>
+        <table id="bookingTable">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Phone</th>
+                    <th>Test Type</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="bookingList">
+                <tr>
+                    <td colspan="6" class="loading">Loading bookings...</td>
+                </tr>
+            </tbody>
+        </table>
+        <p id="message" class="message"></p>
+    </div>
+
+    <script>
+        const bookingList = document.getElementById('bookingList');
+        const message = document.getElementById('message');
+
+        // Base URL for the backend hosted on Render
+        const BASE_URL = 'https://mediscanhub-server.onrender.com';
+
+        // Fetch and display bookings
+        async function loadBookings() {
+            try {
+                const response = await fetch(`${BASE_URL}/api/bookings`);
+                const bookings = await response.json();
+                bookingList.innerHTML = '';
+
+                if (bookings.length === 0) {
+                    bookingList.innerHTML = '<tr><td colspan="6">No bookings found.</td></tr>';
+                    return;
+                }
+
+                bookings.forEach(booking => {
+                    const row = document.createElement('tr');
+                    const statusClass = booking.status === 'accepted' ? 'status-accepted' : booking.status === 'pending' ? 'status-pending' : 'status-rejected';
+                    const statusText = booking.status === 'accepted' ? 'Appointed' : booking.status === 'pending' ? 'Pending' : 'Not Appointed';
+                    row.innerHTML = `
+                        <td>${booking.name}</td>
+                        <td>${booking.email}</td>
+                        <td>${booking.phone}</td>
+                        <td>${booking.testType}</td>
+                        <td><span class="status ${statusClass}">${statusText}</span></td>
+                        <td>
+                            <button class="btn btn-accept" onclick="respond('${booking.id}', 'accept')" ${booking.status !== 'pending' ? 'disabled' : ''}>Appoint</button>
+                            <button class="btn btn-reject" onclick="respond('${booking.id}', 'reject')" ${booking.status !== 'pending' ? 'disabled' : ''}>Reject</button>
+                        </td>
+                    `;
+                    bookingList.appendChild(row);
+                });
+            } catch (error) {
+                console.error('Error fetching bookings:', error);
+                message.textContent = 'Failed to load bookings. Please try again.';
+            }
+        }
+
+        // Handle appoint/reject actions
+        async function respond(bookingId, action) {
+            try {
+                const response = await fetch(`${BASE_URL}/api/respond/${bookingId}/${action}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                });
+                const result = await response.json();
+
+                if (response.ok) {
+                    message.textContent = action === 'accept' ? 'User appointed successfully.' : 'User rejected successfully.';
+                    loadBookings(); // Refresh the table
+                } else {
+                    message.textContent = result.message || 'Action failed.';
+                }
+            } catch (error) {
+                console.error('Error responding to booking:', error);
+                message.textContent = 'An error occurred. Please try again.';
+            }
+        }
+
+        // Load bookings on page load
+        window.onload = loadBookings;
+    </script>
+</body>
+
+</html>
